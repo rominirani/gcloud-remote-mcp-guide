@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "gcloud-remote": {
+      "serverUrl": "https://cloudcli.googleapis.com/mcp",
+      "authProviderType": "google_credentials"
+    }
+  }
+}

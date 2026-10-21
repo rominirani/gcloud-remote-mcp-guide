@@ -1,0 +1,17 @@
+# Python virtual environments & caches
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+
+# OS & editor files
+.DS_Store
+.idea/
+.vscode/
+
+# Environment variables & secrets
+.env
+*.pem
+*.key
