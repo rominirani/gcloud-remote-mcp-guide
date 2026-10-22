@@ -13,6 +13,11 @@ This example demonstrates how to configure the **Google Cloud CLI Remote MCP Ser
 This project uses [`uv`](https://docs.astral.sh/uv/) for dependency and virtual environment management (`pyproject.toml` + PEP 723 inline script metadata).
 
 ### 1. Preview Control Plane & Data Plane Payloads (`--dry-run`)
+Running [`manage_agent.py`](./manage_agent.py) with `--dry-run` makes no live API calls—instead, it prints the exact REST endpoints and JSON payloads for the three stages of the Managed Agent lifecycle:
+1. **Control Plane Creation (`POST .../agents`)**: Defines the agent identity (`id`), model backbone (`base_agent`), `system_instruction`, and the `https://cloudcli.googleapis.com/mcp` tool binding.
+2. **Control Plane Updates (`PATCH .../agents/{agent_id}?update_mask=tools`)**: Shows how to safely rotate OAuth headers or update tools without overwriting `system_instruction` or `description`.
+3. **Data Plane Execution (`Interactions API`)**: Shows the payload client applications send to converse with the stateful agent resource (`projects/{project}/locations/global/agents/cloud-cli-ops-agent`) without re-sending tool definitions on every turn.
+
 ```bash
 export GOOGLE_CLOUD_PROJECT="your-project-id"
 uv sync
