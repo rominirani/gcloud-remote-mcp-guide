@@ -236,9 +236,9 @@ def main() -> None:
         )
         return
 
-    if args.project == "YOUR_PROJECT_ID":
+    if args.project in ("YOUR_PROJECT_ID", "your-project-id", ""):
         raise SystemExit(
-            "Please pass --project YOUR_PROJECT_ID or export GOOGLE_CLOUD_PROJECT=YOUR_PROJECT_ID"
+            "Please export GOOGLE_CLOUD_PROJECT=\"your-project-id\" or pass --project=\"${GOOGLE_CLOUD_PROJECT}\""
         )
 
     token = get_access_token()

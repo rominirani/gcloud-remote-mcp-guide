@@ -14,13 +14,15 @@ This project uses [`uv`](https://docs.astral.sh/uv/) for dependency and virtual 
 
 ### 1. Preview Control Plane & Data Plane Payloads (`--dry-run`)
 ```bash
+export GOOGLE_CLOUD_PROJECT="your-project-id"
 uv sync
-uv run manage_agent.py --project YOUR_PROJECT_ID --dry-run
+uv run manage_agent.py --project="${GOOGLE_CLOUD_PROJECT}" --dry-run
 ```
 
 ### 2. Provision the Managed Agent in Google Cloud
 ```bash
-uv run manage_agent.py --project YOUR_PROJECT_ID
+export GOOGLE_CLOUD_PROJECT="your-project-id"
+uv run manage_agent.py --project="${GOOGLE_CLOUD_PROJECT}"
 ```
 This script automatically:
 1. Registers `https://cloudcli.googleapis.com/mcp` in **Google Cloud Agent Registry** (`agentregistry.googleapis.com/v1alpha/projects/YOUR_PROJECT_ID/locations/global/services?serviceId=gcloud-remote-mcp`) if not already present, obtaining its canonical `mcpServers` resource URI.

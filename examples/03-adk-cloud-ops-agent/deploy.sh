@@ -3,9 +3,9 @@
 set -euo pipefail
 
 PROJECT_ID="${GOOGLE_CLOUD_PROJECT:-YOUR_PROJECT_ID}"
-if [[ "${PROJECT_ID}" == "YOUR_PROJECT_ID" ]]; then
-  echo "Please set GOOGLE_CLOUD_PROJECT to your Google Cloud project ID:"
-  echo "  export GOOGLE_CLOUD_PROJECT=\"YOUR_PROJECT_ID\""
+if [[ "${PROJECT_ID}" == "YOUR_PROJECT_ID" || "${PROJECT_ID}" == "your-project-id" ]]; then
+  echo "Please set GOOGLE_CLOUD_PROJECT to your actual Google Cloud project ID:"
+  echo "  export GOOGLE_CLOUD_PROJECT=\"your-project-id\""
   exit 1
 fi
 

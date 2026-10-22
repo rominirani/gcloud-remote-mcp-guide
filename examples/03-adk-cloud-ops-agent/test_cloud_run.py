@@ -69,9 +69,9 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    if args.project == "YOUR_PROJECT_ID":
+    if args.project in ("YOUR_PROJECT_ID", "your-project-id", ""):
         raise SystemExit(
-            "Please pass --project YOUR_PROJECT_ID or set GOOGLE_CLOUD_PROJECT."
+            "Please set GOOGLE_CLOUD_PROJECT or pass --project=\"${GOOGLE_CLOUD_PROJECT}\"."
         )
 
     base_url = args.url.rstrip("/")

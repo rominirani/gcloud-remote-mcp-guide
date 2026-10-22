@@ -13,14 +13,14 @@ This example implements a **Google Agent Development Kit (ADK)** agent in Python
 ### 1. Run Live End-to-End ADK Test
 ```bash
 uv sync
-export GOOGLE_CLOUD_PROJECT="YOUR_PROJECT_ID"
+export GOOGLE_CLOUD_PROJECT="your-project-id"
 uv run run_live_adk_test.py
 ```
 
 ### 2. Run Interactive ADK Web Playground
 ```bash
 uv sync
-export GOOGLE_CLOUD_PROJECT="YOUR_PROJECT_ID"
+export GOOGLE_CLOUD_PROJECT="your-project-id"
 export GOOGLE_CLOUD_LOCATION="global"
 export GOOGLE_GENAI_USE_VERTEXAI="True"
 export ADK_MODEL="gemini-3-flash-preview"
@@ -29,7 +29,7 @@ uv run adk web
 
 ### 3. Deploy to Cloud Run
 ```bash
-export GOOGLE_CLOUD_PROJECT="YOUR_PROJECT_ID"
+export GOOGLE_CLOUD_PROJECT="your-project-id"
 ./deploy.sh
-uv run test_cloud_run.py --url <CLOUD_RUN_SERVICE_URL> --project YOUR_PROJECT_ID
+uv run test_cloud_run.py --url <CLOUD_RUN_SERVICE_URL> --project="${GOOGLE_CLOUD_PROJECT}"
 ```

@@ -119,10 +119,10 @@ def call_mcp(
 
 def run_suite(project_id: str, output_file: str | None = None) -> dict[str, Any]:
     """Runs the smoke test suite and returns structured results."""
-    if project_id == "YOUR_PROJECT_ID":
+    if project_id in ("YOUR_PROJECT_ID", "your-project-id", ""):
         raise SystemExit(
-            "Please provide your Google Cloud project ID via --project YOUR_PROJECT_ID "
-            "or export GOOGLE_CLOUD_PROJECT=YOUR_PROJECT_ID"
+            "Please provide your actual Google Cloud project ID via "
+            "export GOOGLE_CLOUD_PROJECT=\"your-project-id\" or --project=\"${GOOGLE_CLOUD_PROJECT}\""
         )
 
     print("=== Google Cloud CLI Remote MCP Smoke Test ===")

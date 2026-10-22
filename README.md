@@ -41,7 +41,7 @@ Ready-to-run examples for integrating Google Cloud's stateless **`gcloud` and `b
 
 1. Set your Google Cloud project ID and enable the Cloud CLI Execution API:
    ```bash
-   export GOOGLE_CLOUD_PROJECT="YOUR_PROJECT_ID"
+   export GOOGLE_CLOUD_PROJECT="your-project-id"
    gcloud services enable cloudcli.googleapis.com --project="${GOOGLE_CLOUD_PROJECT}" --quiet
    ```
 2. Grant `roles/mcp.toolUser` (`mcp.tools.call` permission) and least-privilege IAM roles (such as `roles/viewer`) to your user identity or Service Account:
@@ -64,17 +64,17 @@ All Python examples use [`uv`](https://docs.astral.sh/uv/) (`pyproject.toml` + P
 
 ### 1. Run the `curl` or Python Smoke Test
 ```bash
-export GOOGLE_CLOUD_PROJECT="YOUR_PROJECT_ID"
+export GOOGLE_CLOUD_PROJECT="your-project-id"
 bash examples/01-wire-protocol-smoke-test/curl_examples.sh
 # or
-uv run examples/01-wire-protocol-smoke-test/mcp_probe.py --project YOUR_PROJECT_ID
+uv run examples/01-wire-protocol-smoke-test/mcp_probe.py --project="${GOOGLE_CLOUD_PROJECT}"
 ```
 
 ### 2. Run the ADK Agent (`gemini-3-flash-preview`)
 ```bash
 cd examples/03-adk-cloud-ops-agent
 uv sync
-export GOOGLE_CLOUD_PROJECT="YOUR_PROJECT_ID"
+export GOOGLE_CLOUD_PROJECT="your-project-id"
 export GOOGLE_CLOUD_LOCATION="global"
 export GOOGLE_GENAI_USE_VERTEXAI="True"
 uv run adk web
@@ -82,5 +82,6 @@ uv run adk web
 
 ### 3. Preview or Provision a Managed Agent
 ```bash
-uv run examples/04-managed-agent/manage_agent.py --project YOUR_PROJECT_ID --dry-run
+export GOOGLE_CLOUD_PROJECT="your-project-id"
+uv run examples/04-managed-agent/manage_agent.py --project="${GOOGLE_CLOUD_PROJECT}" --dry-run
 ```

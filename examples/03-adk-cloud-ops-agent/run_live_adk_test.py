@@ -54,10 +54,10 @@ async def run_prompt(runner: Any, user_id: str, session_id: str, prompt: str) ->
 
 
 async def main() -> None:
-    if PROJECT_ID == "YOUR_PROJECT_ID":
+    if PROJECT_ID in ("YOUR_PROJECT_ID", "your-project-id", ""):
         raise SystemExit(
-            "Please set GOOGLE_CLOUD_PROJECT before running:\n"
-            "  export GOOGLE_CLOUD_PROJECT=\"YOUR_PROJECT_ID\""
+            "Please set GOOGLE_CLOUD_PROJECT to your actual project ID before running:\n"
+            "  export GOOGLE_CLOUD_PROJECT=\"your-project-id\""
         )
 
     from google.adk.runners import InMemoryRunner

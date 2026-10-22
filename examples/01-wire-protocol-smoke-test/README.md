@@ -13,7 +13,7 @@ This example tests the **Google Cloud CLI Remote MCP Server** (`https://cloudcli
 
 1. Enable the Cloud CLI Execution API on your project:
    ```bash
-   export GOOGLE_CLOUD_PROJECT="YOUR_PROJECT_ID"
+   export GOOGLE_CLOUD_PROJECT="your-project-id"
    gcloud services enable cloudcli.googleapis.com --project="${GOOGLE_CLOUD_PROJECT}" --quiet
    ```
 2. Ensure your caller identity holds `roles/mcp.toolUser` (`mcp.tools.call` permission) and least-privilege IAM roles (such as `roles/viewer`).
@@ -23,14 +23,15 @@ This example tests the **Google Cloud CLI Remote MCP Server** (`https://cloudcli
 [`mcp_probe.py`](./mcp_probe.py) includes inline PEP 723 dependency metadata (`requires-python = ">=3.11"`, `google-auth`, `requests`) alongside [`pyproject.toml`](./pyproject.toml), so `uv` automatically provisions an isolated Python environment and installs dependencies on the fly:
 
 ```bash
+export GOOGLE_CLOUD_PROJECT="your-project-id"
 cd examples/01-wire-protocol-smoke-test
 uv sync
-uv run mcp_probe.py --project YOUR_PROJECT_ID
+uv run mcp_probe.py --project="${GOOGLE_CLOUD_PROJECT}"
 ```
 
 Or run the raw `curl` script:
 
 ```bash
-export GOOGLE_CLOUD_PROJECT="YOUR_PROJECT_ID"
+export GOOGLE_CLOUD_PROJECT="your-project-id"
 bash curl_examples.sh
 ```
