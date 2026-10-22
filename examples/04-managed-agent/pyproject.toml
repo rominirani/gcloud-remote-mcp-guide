@@ -6,5 +6,6 @@ readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
     "google-auth>=2.35.0",
+    "google-genai>=2.3.0",
     "requests>=2.32.0",
 ]

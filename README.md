@@ -80,8 +80,18 @@ export GOOGLE_GENAI_USE_VERTEXAI="True"
 uv run adk web
 ```
 
-### 3. Preview or Provision a Managed Agent
+### 3. Preview, Provision, Verify, or Interact with a Managed Agent
 ```bash
 export GOOGLE_CLOUD_PROJECT="your-project-id"
+# Preview payloads (--dry-run)
 uv run examples/04-managed-agent/manage_agent.py --project="${GOOGLE_CLOUD_PROJECT}" --dry-run
+
+# Provision in Google Cloud
+uv run examples/04-managed-agent/manage_agent.py --project="${GOOGLE_CLOUD_PROJECT}" --action=provision
+
+# Check provisioned status (Control Plane + Agent Registry)
+uv run examples/04-managed-agent/manage_agent.py --project="${GOOGLE_CLOUD_PROJECT}" --action=status
+
+# Interact via the Data Plane (Interactions API)
+uv run examples/04-managed-agent/manage_agent.py --project="${GOOGLE_CLOUD_PROJECT}" --action=interact
 ```
