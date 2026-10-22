@@ -1,4 +1,11 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.11"
+# dependencies = [
+#     "google-auth>=2.35.0",
+#     "requests>=2.32.0",
+# ]
+# ///
 """Simple Wire-Protocol Smoke Test for Google Cloud CLI Remote MCP Server.
 
 Tests https://cloudcli.googleapis.com/mcp against a Google Cloud project:
@@ -25,7 +32,7 @@ DEFAULT_PROJECT_ID = os.environ.get("GOOGLE_CLOUD_PROJECT", "YOUR_PROJECT_ID")
 
 
 def get_oauth_access_token() -> str:
-    """Retrieves an OAuth 2.0 access token via environment, google-auth, or gcloud."""
+    """Retrieves an OAuth 2.0 access token via environment, google-auth ADC, or gcloud."""
     env_token = os.environ.get("GCP_ACCESS_TOKEN")
     if env_token:
         return env_token.strip()
@@ -63,7 +70,7 @@ def get_oauth_access_token() -> str:
         if res.returncode == 0 and res.stdout.strip():
             return res.stdout.strip()
 
-    raise RuntimeError("Failed to obtain an OAuth 2.0 access token from gcloud.")
+    raise RuntimeError("Failed to obtain an OAuth 2.0 access token from ADC or gcloud.")
 
 
 def call_mcp(

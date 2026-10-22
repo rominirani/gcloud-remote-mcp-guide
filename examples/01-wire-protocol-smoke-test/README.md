@@ -18,10 +18,14 @@ This example tests the **Google Cloud CLI Remote MCP Server** (`https://cloudcli
    ```
 2. Ensure your caller identity holds `roles/mcp.toolUser` (`mcp.tools.call` permission) and least-privilege IAM roles (such as `roles/viewer`).
 
-## Running the Smoke Test
+## Running the Smoke Test with `uv`
+
+[`mcp_probe.py`](./mcp_probe.py) includes inline PEP 723 dependency metadata (`requires-python = ">=3.11"`, `google-auth`, `requests`) alongside [`pyproject.toml`](./pyproject.toml), so `uv` automatically provisions an isolated Python environment and installs dependencies on the fly:
 
 ```bash
-python3 mcp_probe.py --project YOUR_PROJECT_ID
+cd examples/01-wire-protocol-smoke-test
+uv sync
+uv run mcp_probe.py --project YOUR_PROJECT_ID
 ```
 
 Or run the raw `curl` script:

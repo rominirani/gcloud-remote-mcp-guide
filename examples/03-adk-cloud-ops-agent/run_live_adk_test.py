@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S uv run
 """Live End-to-End ADK Agent Verification against Google Cloud CLI Remote MCP.
 
 Executes two live prompts through ADK's InMemoryRunner using gemini-3-flash-preview

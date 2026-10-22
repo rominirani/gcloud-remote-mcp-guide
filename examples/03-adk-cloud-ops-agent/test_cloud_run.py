@@ -1,4 +1,8 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.11"
+# dependencies = []
+# ///
 """Live Verification Script for the Deployed Cloud Run ADK Agent Service."""
 
 from __future__ import annotations

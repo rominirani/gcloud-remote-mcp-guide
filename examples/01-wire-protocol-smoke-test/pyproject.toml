@@ -1,0 +1,10 @@
+[project]
+name = "gcloud-mcp-smoke-test"
+version = "0.1.0"
+description = "Wire-protocol smoke test for the Google Cloud CLI Remote MCP Server (cloudcli.googleapis.com/mcp)"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "google-auth>=2.35.0",
+    "requests>=2.32.0",
+]

@@ -1,4 +1,11 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.11"
+# dependencies = [
+#     "google-auth>=2.35.0",
+#     "requests>=2.32.0",
+# ]
+# ///
 """Gemini Enterprise Agent Platform — Managed Agents Control Plane & Data Plane Utility.
 
 Demonstrates how to:
@@ -27,10 +34,23 @@ GCLOUD_MCP_URL = "https://cloudcli.googleapis.com/mcp"
 
 
 def get_access_token() -> str:
-    """Retrieves an OAuth 2.0 access token via environment or gcloud."""
+    """Retrieves an OAuth 2.0 access token via ADC, environment, or gcloud."""
     env_token = os.environ.get("GCP_ACCESS_TOKEN")
     if env_token:
         return env_token.strip()
+
+    try:
+        import google.auth
+        import google.auth.transport.requests
+
+        credentials, _ = google.auth.default(
+            scopes=["https://www.googleapis.com/auth/cloud-platform"]
+        )
+        credentials.refresh(google.auth.transport.requests.Request())
+        if credentials.token:
+            return credentials.token
+    except Exception:
+        pass
 
     gcloud_bin = shutil.which("gcloud")
     if not gcloud_bin:

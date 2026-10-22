@@ -20,7 +20,7 @@ curl -sS -X POST "${MCP_ENDPOINT}" \
   -H "Accept: application/json, text/event-stream" \
   -H "MCP-Protocol-Version: ${MCP_VERSION}" \
   -H "Mcp-Method: tools/list" \
-  -d @- <<EOF | python3 -m json.tool
+  -d @- <<EOF | uv run python -m json.tool
 {
   "jsonrpc": "2.0",
   "id": 1,
@@ -43,7 +43,7 @@ curl -sS -X POST "${MCP_ENDPOINT}" \
   -H "Accept: application/json, text/event-stream" \
   -H "MCP-Protocol-Version: ${MCP_VERSION}" \
   -H "Mcp-Method: tools/call" \
-  -d @- <<EOF | python3 -m json.tool
+  -d @- <<EOF | uv run python -m json.tool
 {
   "jsonrpc": "2.0",
   "id": 2,
@@ -66,7 +66,7 @@ curl -sS -X POST "${MCP_ENDPOINT}" \
   -H "Accept: application/json, text/event-stream" \
   -H "MCP-Protocol-Version: ${MCP_VERSION}" \
   -H "Mcp-Method: tools/call" \
-  -d @- <<EOF | python3 -m json.tool
+  -d @- <<EOF | uv run python -m json.tool
 {
   "jsonrpc": "2.0",
   "id": 3,

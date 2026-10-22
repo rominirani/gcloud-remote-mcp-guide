@@ -12,6 +12,7 @@ Ready-to-run examples for integrating Google Cloud's stateless **`gcloud` and `b
 └── examples/
     ├── 01-wire-protocol-smoke-test/                 # Direct HTTP / JSON-RPC 2.0 smoke test
     │   ├── README.md
+    │   ├── pyproject.toml                           # uv project & dependencies
     │   ├── curl_examples.sh                         # Raw curl requests for tools/list & tools/call
     │   └── mcp_probe.py                             # Simple Python smoke test script
     ├── 02-local-ide-config/                         # Local IDE setup (Antigravity / Gemini CLI)
@@ -19,8 +20,8 @@ Ready-to-run examples for integrating Google Cloud's stateless **`gcloud` and `b
     │   └── mcp_config.json                          # google_credentials ADC config
     ├── 03-adk-cloud-ops-agent/                      # Google ADK Agent (gemini-3-flash-preview)
     │   ├── README.md
-    │   ├── Dockerfile                               # Lean python:3.12-slim container (no Cloud SDK)
-    │   ├── pyproject.toml
+    │   ├── Dockerfile                               # Lean python:3.12-slim + uv container (no Cloud SDK)
+    │   ├── pyproject.toml                           # uv project & dependencies
     │   ├── server.py                                # FastAPI ADK entrypoint for Cloud Run
     │   ├── deploy.sh                                # Cloud Run deployment script
     │   ├── run_live_adk_test.py                     # End-to-end ADK test script
@@ -30,6 +31,7 @@ Ready-to-run examples for integrating Google Cloud's stateless **`gcloud` and `b
     │       └── agent.py                             # McpToolset + dynamic ADC header_provider
     └── 04-managed-agent/                            # Gemini Enterprise Agent Platform Managed Agents
         ├── README.md
+        ├── pyproject.toml                           # uv project & dependencies
         └── manage_agent.py                          # Agent Registry onboarding + Control/Data Plane script
 ```
 
@@ -49,7 +51,7 @@ Ready-to-run examples for integrating Google Cloud's stateless **`gcloud` and `b
      --role="roles/mcp.toolUser" \
      --quiet
    ```
-3. Authenticate local Application Default Credentials (ADC):
+3. Authenticate local Application Default Credentials (ADC) and ensure [`uv`](https://docs.astral.sh/uv/) is installed:
    ```bash
    gcloud auth application-default login
    ```
@@ -58,12 +60,14 @@ Ready-to-run examples for integrating Google Cloud's stateless **`gcloud` and `b
 
 ## Quickstart Commands
 
+All Python examples use [`uv`](https://docs.astral.sh/uv/) (`pyproject.toml` + PEP 723 inline script metadata) so Python `>=3.11` and dependencies are resolved automatically without manual virtual environment setup.
+
 ### 1. Run the `curl` or Python Smoke Test
 ```bash
 export GOOGLE_CLOUD_PROJECT="YOUR_PROJECT_ID"
 bash examples/01-wire-protocol-smoke-test/curl_examples.sh
 # or
-python3 examples/01-wire-protocol-smoke-test/mcp_probe.py --project YOUR_PROJECT_ID
+uv run examples/01-wire-protocol-smoke-test/mcp_probe.py --project YOUR_PROJECT_ID
 ```
 
 ### 2. Run the ADK Agent (`gemini-3-flash-preview`)
@@ -78,5 +82,5 @@ uv run adk web
 
 ### 3. Preview or Provision a Managed Agent
 ```bash
-python3 examples/04-managed-agent/manage_agent.py --project YOUR_PROJECT_ID --dry-run
+uv run examples/04-managed-agent/manage_agent.py --project YOUR_PROJECT_ID --dry-run
 ```
