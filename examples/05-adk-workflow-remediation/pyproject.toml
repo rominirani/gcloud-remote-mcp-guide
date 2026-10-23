@@ -1,0 +1,11 @@
+[project]
+name = "gcloud-mcp-adk-workflow-remediation"
+version = "0.1.0"
+description = "ADK Workflow Graph for Cloud Infrastructure Audit & Live Remediation via Google Cloud CLI Remote MCP Server"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "google-adk[mcp,gcp]>=2.0.0",
+    "google-auth>=2.35.0",
+    "pydantic>=2.9.0",
+]

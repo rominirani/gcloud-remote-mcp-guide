@@ -29,10 +29,17 @@ Ready-to-run examples for integrating Google Cloud's stateless **`gcloud` and `b
     │   └── app/
     │       ├── __init__.py
     │       └── agent.py                             # McpToolset + dynamic ADC header_provider
-    └── 04-managed-agent/                            # Gemini Enterprise Agent Platform Managed Agents
+    ├── 04-managed-agent/                            # Gemini Enterprise Agent Platform Managed Agents
+    │   ├── README.md
+    │   ├── pyproject.toml                           # uv project & dependencies
+    │   └── manage_agent.py                          # Agent Registry onboarding + Control/Data Plane script
+    └── 05-adk-workflow-remediation/                 # Part 2: ADK Workflow Graph for Cloud Audit & Live Remediation
         ├── README.md
         ├── pyproject.toml                           # uv project & dependencies
-        └── manage_agent.py                          # Agent Registry onboarding + Control/Data Plane script
+        ├── run_workflow.py                          # Executes the 4-node ADK Workflow & prints node events/state
+        └── app/
+            ├── __init__.py
+            └── agent.py                             # FunctionNode + LlmAgent + Event routing + Remote MCP
 ```
 
 ---
@@ -94,4 +101,10 @@ uv run examples/04-managed-agent/manage_agent.py --project="${GOOGLE_CLOUD_PROJE
 
 # Interact via the Data Plane (Interactions API)
 uv run examples/04-managed-agent/manage_agent.py --project="${GOOGLE_CLOUD_PROJECT}" --action=interact
+```
+
+### 4. Run the Part 2 ADK `Workflow` Graph (Cloud Audit & Live Remediation)
+```bash
+export GOOGLE_CLOUD_PROJECT="your-project-id"
+uv run examples/05-adk-workflow-remediation/run_workflow.py --project="${GOOGLE_CLOUD_PROJECT}"
 ```
