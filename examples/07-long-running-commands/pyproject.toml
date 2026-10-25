@@ -1,0 +1,13 @@
+[project]
+name = "gcloud-mcp-long-running-commands"
+version = "0.1.0"
+description = "Handling and Verifying Long-Running gcloud Commands (--async + LRO Polling + State Verification) in Google ADK and Managed Agents"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "google-adk[mcp,gcp]>=2.0.0",
+    "google-auth>=2.35.0",
+    "google-genai>=2.3.0",
+    "pydantic>=2.9.0",
+    "requests>=2.32.0",
+]

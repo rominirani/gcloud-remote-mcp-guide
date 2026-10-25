@@ -33,13 +33,32 @@ Ready-to-run examples for integrating Google Cloud's stateless **`gcloud` and `b
     │   ├── README.md
     │   ├── pyproject.toml                           # uv project & dependencies
     │   └── manage_agent.py                          # Agent Registry onboarding + Control/Data Plane script
-    └── 05-adk-workflow-remediation/                 # Part 2: ADK Workflow Graph for Cloud Audit & Live Remediation
+    ├── 05-adk-workflow-remediation/                 # Part 2: ADK Workflow Graph for Cloud Audit & Live Remediation
+    │   ├── README.md
+    │   ├── pyproject.toml                           # uv project & dependencies
+    │   ├── run_workflow.py                          # Executes the 4-node ADK Workflow & prints node events/state
+    │   └── app/
+    │       ├── __init__.py
+    │       └── agent.py                             # FunctionNode + LlmAgent + Event routing + Remote MCP
+    ├── 06-adk-workflow-hitl-cloud-run/              # Part 3: Resumable HITL Workflow on Cloud Run + VertexAiSessionService
+    │   ├── README.md
+    │   ├── pyproject.toml                           # uv project & dependencies
+    │   ├── Dockerfile                               # Lean Cloud Run container image
+    │   ├── setup_session_engine.py                  # Provisions Vertex AI ReasoningEngine session store
+    │   ├── server.py                                # FastAPI server wired to agentengine:// session URI
+    │   ├── deploy.sh                                # Cloud Run deployment script with least-privilege SA
+    │   ├── run_hitl_client.py                       # 2-request HTTP client (Pause -> Approve/Reject -> Resume)
+    │   └── app/
+    │       ├── __init__.py
+    │       └── agent.py                             # 6-node Resumable ADK Workflow (@node(rerun_on_resume=True) + RequestInput)
+    └── 07-long-running-commands/                    # Part 4: Handling & Verifying Long-Running gcloud Commands (--async)
         ├── README.md
         ├── pyproject.toml                           # uv project & dependencies
-        ├── run_workflow.py                          # Executes the 4-node ADK Workflow & prints node events/state
+        ├── run_adk_lro_workflow.py                  # Approach 1: 7-Node ADK Workflow with cyclic LRO polling
+        ├── run_managed_lro.py                       # Approach 2: Managed Agent + Stateful Interactions API LRO runner
         └── app/
             ├── __init__.py
-            └── agent.py                             # FunctionNode + LlmAgent + Event routing + Remote MCP
+            └── agent.py                             # 7-node cyclic ADK Workflow (submit -> poll <-> evaluate -> verify)
 ```
 
 ---
@@ -107,4 +126,37 @@ uv run examples/04-managed-agent/manage_agent.py --project="${GOOGLE_CLOUD_PROJE
 ```bash
 export GOOGLE_CLOUD_PROJECT="your-project-id"
 uv run examples/05-adk-workflow-remediation/run_workflow.py --project="${GOOGLE_CLOUD_PROJECT}"
+```
+
+### 5. Run the Part 3 Resumable HITL Workflow (Cloud Run & `VertexAiSessionService`)
+```bash
+export GOOGLE_CLOUD_PROJECT="your-project-id"
+
+# Provision/reuse the Vertex AI Agent Engine session store
+uv run --project examples/06-adk-workflow-hitl-cloud-run \
+  examples/06-adk-workflow-hitl-cloud-run/setup_session_engine.py \
+  --project="${GOOGLE_CLOUD_PROJECT}"
+
+# Run the 2-request HITL client (reject or approve)
+uv run --project examples/06-adk-workflow-hitl-cloud-run \
+  examples/06-adk-workflow-hitl-cloud-run/run_hitl_client.py \
+  --url="http://127.0.0.1:8080" \
+  --decision=approve
+```
+
+### 6. Run the Part 4 Long-Running `gcloud` Commands (`--async`) with Polling & Resource Verification
+```bash
+export GOOGLE_CLOUD_PROJECT="your-project-id"
+
+# Approach 1: 7-Node ADK Workflow with Cyclic Operation Polling & Resource Verification
+uv run --project examples/07-long-running-commands \
+  examples/07-long-running-commands/run_adk_lro_workflow.py \
+  --project="${GOOGLE_CLOUD_PROJECT}" \
+  --action=start
+
+# Approach 2: Managed Agent + Stateful Interactions API LRO & Verification
+uv run --project examples/07-long-running-commands \
+  examples/07-long-running-commands/run_managed_lro.py \
+  --project="${GOOGLE_CLOUD_PROJECT}" \
+  --action=stop
 ```

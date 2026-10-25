@@ -1,0 +1,17 @@
+[project]
+name = "gcloud-mcp-hitl-cloud-run"
+version = "0.1.0"
+description = "Part 3: 6-Node Resumable ADK Workflow with Human-in-the-Loop (HITL) on Cloud Run & VertexAiSessionService"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.115.0",
+    "google-adk[mcp,gcp]>=2.0.0",
+    "google-auth>=2.35.0",
+    "google-cloud-aiplatform>=1.85.0",
+    "google-genai>=2.3.0",
+    "httpx>=0.28.0",
+    "pydantic>=2.9.0",
+    "requests>=2.32.0",
+    "uvicorn>=0.34.0",
+]
