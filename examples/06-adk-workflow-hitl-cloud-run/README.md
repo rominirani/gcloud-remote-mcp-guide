@@ -91,6 +91,20 @@ uv run examples/06-adk-workflow-hitl-cloud-run/run_hitl_client.py \
 # 3. Test Healthy Single-Request Completion (when demo-web-server is RUNNING)
 uv run examples/06-adk-workflow-hitl-cloud-run/run_hitl_client.py \
   --url=http://127.0.0.1:8080
+
+# 4. Test Stale Approval Expiry (approving AFTER --ttl-seconds=2 has expired)
+uv run examples/06-adk-workflow-hitl-cloud-run/run_hitl_client.py \
+  --spawn-local-server \
+  --decision=approve \
+  --ttl-seconds=2 \
+  --simulate-delay-seconds=3
+
+# 5. Test Default Action When Nobody Answers (--decision=timeout)
+uv run examples/06-adk-workflow-hitl-cloud-run/run_hitl_client.py \
+  --spawn-local-server \
+  --decision=timeout \
+  --ttl-seconds=2 \
+  --default-timeout-action=reject
 ```
 
 ---

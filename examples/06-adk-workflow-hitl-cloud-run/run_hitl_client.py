@@ -135,9 +135,27 @@ def main() -> None:
     parser.add_argument("--user-id", default="sre-operator")
     parser.add_argument(
         "--decision",
-        choices=["approve", "reject", "interactive"],
+        choices=["approve", "reject", "timeout", "interactive"],
         default="interactive",
-        help="Decision when HITL pause is triggered: 'approve', 'reject', or 'interactive'.",
+        help="Decision when HITL pause is triggered: 'approve', 'reject', 'timeout' (nobody answers), or 'interactive'.",
+    )
+    parser.add_argument(
+        "--ttl-seconds",
+        type=int,
+        default=int(os.environ.get("HITL_APPROVAL_TTL_SECONDS", "900")),
+        help="Approval TTL in seconds before a request expires (default: 900s).",
+    )
+    parser.add_argument(
+        "--default-timeout-action",
+        choices=["reject", "approve"],
+        default=os.environ.get("HITL_DEFAULT_TIMEOUT_ACTION", "reject"),
+        help="Default action executed when nobody answers within --ttl-seconds (default: 'reject').",
+    )
+    parser.add_argument(
+        "--simulate-delay-seconds",
+        type=float,
+        default=0.0,
+        help="Seconds to sleep before sending HTTP Request 2 (use to test stale approval expiry).",
     )
     parser.add_argument(
         "--approver",
@@ -181,6 +199,8 @@ def main() -> None:
             env["GOOGLE_CLOUD_AGENT_ENGINE_ID"] = args.agent_engine_id
         env.setdefault("GOOGLE_CLOUD_LOCATION", "us-central1")
         env.setdefault("GOOGLE_GENAI_USE_VERTEXAI", "TRUE")
+        env["HITL_APPROVAL_TTL_SECONDS"] = str(args.ttl_seconds)
+        env["HITL_DEFAULT_TIMEOUT_ACTION"] = str(args.default_timeout_action)
 
         server_dir = Path(__file__).resolve().parent
         port = base_url.rsplit(":", 1)[-1] if ":" in base_url.split("//")[-1] else "8080"
@@ -280,10 +300,42 @@ def main() -> None:
                 )
                 print("!" * 78)
 
+                if args.simulate_delay_seconds > 0:
+                    print(
+                        f"\n  [Simulating Delay] Waiting {args.simulate_delay_seconds}s before sending HTTP Request 2..."
+                    )
+                    time.sleep(args.simulate_delay_seconds)
+
                 if args.decision == "interactive":
                     ans = input("\nApprove VM remediation? [y/N]: ").strip().lower()
                     approved = ans in ("y", "yes", "approve", "approved")
                     reason = args.reason or input("Optional comment: ").strip()
+                    decision_payload: dict[str, Any] = {
+                        "approved": approved,
+                        "approver": args.approver,
+                        "reason": reason,
+                    }
+                elif args.decision == "timeout":
+                    payload_ttl = int(
+                        (int_args.get("payload") or {}).get(
+                            "ttl_seconds", args.ttl_seconds
+                        )
+                    )
+                    wait_secs = max(0.0, float(payload_ttl))
+                    if wait_secs > 0 and args.simulate_delay_seconds == 0:
+                        print(
+                            f"\n  [Watchdog Timer] Waiting {wait_secs}s for human response before triggering default timeout action..."
+                        )
+                        time.sleep(wait_secs + 0.2)
+                    decision_payload = {
+                        "timed_out": True,
+                        "approver": "system-ttl-watchdog",
+                        "reason": args.reason
+                        or (
+                            f"No operator response within {payload_ttl}s TTL; "
+                            f"executing default_timeout_action='{args.default_timeout_action}'."
+                        ),
+                    }
                 else:
                     approved = args.decision == "approve"
                     reason = args.reason or (
@@ -291,12 +343,11 @@ def main() -> None:
                         if approved
                         else "Rejected by SRE on-call; VM intentionally stopped for maintenance."
                     )
-
-                decision_payload = {
-                    "approved": approved,
-                    "approver": args.approver,
-                    "reason": reason,
-                }
+                    decision_payload = {
+                        "approved": approved,
+                        "approver": args.approver,
+                        "reason": reason,
+                    }
                 print(
                     f"\n=== HTTP Request 2: POST /run (Resume Session {session_id} with Decision) ==="
                 )
@@ -342,6 +393,9 @@ def main() -> None:
                 "default_zone",
                 "target_vm_name",
                 "target_vm_status",
+                "approval_ttl_seconds",
+                "approval_expires_at_iso",
+                "default_timeout_action",
                 "approval_status",
                 "approved_by",
                 "approval_comment",

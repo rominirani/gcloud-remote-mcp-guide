@@ -44,7 +44,9 @@ from __future__ import annotations
 import json
 import os
 import re
+import time
 from collections.abc import AsyncGenerator
+from datetime import datetime, timezone
 from typing import Any
 
 from google.adk.agents import LlmAgent
@@ -66,6 +68,12 @@ DEFAULT_ZONE = os.environ.get("GOOGLE_CLOUD_ZONE", "us-central1-a")
 os.environ.setdefault("GOOGLE_CLOUD_LOCATION", DEFAULT_REGION)
 GCLOUD_MCP_URL = "https://cloudcli.googleapis.com/mcp"
 HITL_INTERRUPT_ID = "approve_vm_remediation"
+DEFAULT_APPROVAL_TTL_SECONDS = int(
+    os.environ.get("HITL_APPROVAL_TTL_SECONDS", "900")
+)
+DEFAULT_TIMEOUT_ACTION = os.environ.get(
+    "HITL_DEFAULT_TIMEOUT_ACTION", "reject"
+)
 
 
 def _get_gemini_model() -> Gemini:
@@ -234,6 +242,20 @@ def evaluate_and_route(
         risk_level = "low"
         reason = f"No Compute Engine VMs found in zone '{default_zone}'."
 
+    ttl_seconds = int(
+        os.environ.get(
+            "HITL_APPROVAL_TTL_SECONDS", str(DEFAULT_APPROVAL_TTL_SECONDS)
+        )
+    )
+    default_timeout_action = os.environ.get(
+        "HITL_DEFAULT_TIMEOUT_ACTION", DEFAULT_TIMEOUT_ACTION
+    ).lower()
+    requested_at = round(time.time(), 3)
+    expires_at = round(requested_at + ttl_seconds, 3)
+    expires_at_iso = datetime.fromtimestamp(
+        expires_at, tz=timezone.utc
+    ).strftime("%Y-%m-%dT%H:%M:%SZ")
+
     state_updates = {
         "target_vm_name": vm_name,
         "target_vm_status": vm_status,
@@ -242,6 +264,11 @@ def evaluate_and_route(
         "risk_level": risk_level,
         "remediation_reason": reason,
         "terminated_vms": non_running_vms,
+        "approval_requested_at": requested_at,
+        "approval_expires_at": expires_at,
+        "approval_expires_at_iso": expires_at_iso,
+        "approval_ttl_seconds": ttl_seconds,
+        "default_timeout_action": default_timeout_action,
     }
 
     return Event(
@@ -292,7 +319,7 @@ Task:
 async def request_remediation_approval(
     ctx: Context, node_input: dict[str, Any]
 ) -> AsyncGenerator[Event | RequestInput, None]:
-    """Pauses the workflow on Pass 1 via RequestInput; routes on Pass 2 based on human reply."""
+    """Pauses the workflow on Pass 1 via RequestInput; enforces TTL expiry and default timeout actions on Pass 2."""
     resume_data = ctx.resume_inputs.get(HITL_INTERRUPT_ID)
 
     # Pass 1 (HTTP Request 1): Emit RequestInput interrupt and checkpoint to VertexAiSessionService
@@ -301,6 +328,14 @@ async def request_remediation_approval(
         vm_zone = ctx.state.get("default_zone", DEFAULT_ZONE)
         project_id = ctx.state.get("target_project", DEFAULT_PROJECT_ID)
         reason = ctx.state.get("remediation_reason", "")
+        ttl_seconds = int(
+            ctx.state.get("approval_ttl_seconds", DEFAULT_APPROVAL_TTL_SECONDS)
+        )
+        expires_at = float(ctx.state.get("approval_expires_at", 0.0) or 0.0)
+        expires_at_iso = str(ctx.state.get("approval_expires_at_iso", ""))
+        default_timeout_action = str(
+            ctx.state.get("default_timeout_action", DEFAULT_TIMEOUT_ACTION)
+        )
 
         proposed_actions = [
             f"Label VM '{vm_name}' with audit-status=remediated,risk-level=low",
@@ -309,7 +344,8 @@ async def request_remediation_approval(
         ]
         prompt_msg = (
             f"HITL Approval Required: {reason} "
-            f"Approve live remediation on '{vm_name}' in project '{project_id}'?"
+            f"Approve live remediation on '{vm_name}' in project '{project_id}'? "
+            f"(Expires at {expires_at_iso} [TTL={ttl_seconds}s]; default action on timeout='{default_timeout_action}')"
         )
 
         yield RequestInput(
@@ -322,20 +358,27 @@ async def request_remediation_approval(
                 "target_vm_name": vm_name,
                 "reason": reason,
                 "proposed_actions": proposed_actions,
+                "ttl_seconds": ttl_seconds,
+                "expires_at": expires_at,
+                "expires_at_iso": expires_at_iso,
+                "default_timeout_action": default_timeout_action,
             },
         )
         return
 
-    # Pass 2 (HTTP Request 2): Evaluate human operator's decision from ctx.resume_inputs
+    # Pass 2 (HTTP Request 2): Evaluate human decision or timeout watchdog from ctx.resume_inputs
     if isinstance(resume_data, str):
         try:
             resume_data = json.loads(resume_data)
         except json.JSONDecodeError:
             resume_data = {
-                "approved": resume_data.strip().lower() in ("true", "yes", "y", "approve", "approved")
+                "approved": resume_data.strip().lower()
+                in ("true", "yes", "y", "approve", "approved")
             }
 
+    timed_out = False
     if isinstance(resume_data, dict):
+        timed_out = bool(resume_data.get("timed_out", False))
         approved = bool(resume_data.get("approved", False))
         approver = str(resume_data.get("approver", "sre-operator"))
         comment = str(resume_data.get("reason", resume_data.get("comment", "")))
@@ -344,22 +387,75 @@ async def request_remediation_approval(
         approver = "sre-operator"
         comment = ""
 
-    route = "approved" if approved else "rejected"
+    now_ts = time.time()
+    expires_at = float(ctx.state.get("approval_expires_at", 0.0) or 0.0)
+    expires_at_iso = str(ctx.state.get("approval_expires_at_iso", ""))
+    ttl_seconds = int(
+        ctx.state.get("approval_ttl_seconds", DEFAULT_APPROVAL_TTL_SECONDS)
+    )
+    default_timeout_action = str(
+        ctx.state.get("default_timeout_action", DEFAULT_TIMEOUT_ACTION)
+    ).lower()
+    is_expired = expires_at > 0 and now_ts > expires_at
+
+    if timed_out:
+        # Feature 2: Default Action when Nobody Answers within TTL
+        approved = default_timeout_action == "approve"
+        route = "approved" if approved else "rejected"
+        approval_status = f"timed_out_default_{route}"
+        approver = (
+            approver if approver != "sre-operator" else "system-ttl-watchdog"
+        )
+        comment = comment or (
+            f"No human response received within {ttl_seconds}s TTL "
+            f"(expired at {expires_at_iso}). Executed default_timeout_action='{default_timeout_action}'."
+        )
+        audit_status = "remediated" if approved else "remediation-timed-out"
+        summary_text = (
+            f"[Node 4B: request_remediation_approval] No human response within {ttl_seconds}s TTL; "
+            f"watchdog '{approver}' applied default_timeout_action='{default_timeout_action}' "
+            f"for VM '{ctx.state.get('target_vm_name')}' -> route='{route}'"
+        )
+    elif is_expired:
+        # Feature 1: Stale Approval Guard (Reject late approvals after TTL expiry)
+        late_by = round(now_ts - expires_at, 1)
+        approved = False
+        route = "rejected"
+        approval_status = "expired"
+        audit_status = "remediation-expired"
+        comment = (
+            f"Stale response blocked: operator '{approver}' responded {late_by}s after "
+            f"the {ttl_seconds}s approval window expired at {expires_at_iso}. "
+            f"(Original comment: {comment!r})"
+        )
+        summary_text = (
+            f"[Node 4B: request_remediation_approval] STALE APPROVAL BLOCKED for VM "
+            f"'{ctx.state.get('target_vm_name')}': response from '{approver}' arrived "
+            f"{late_by}s after TTL ({ttl_seconds}s) expired at {expires_at_iso} -> route='rejected'"
+        )
+    else:
+        # Normal timely human decision within TTL
+        route = "approved" if approved else "rejected"
+        approval_status = route
+        audit_status = "remediated" if approved else "remediation-rejected"
+        summary_text = (
+            f"[Node 4B: request_remediation_approval] Operator '{approver}' "
+            f"{route.upper()} remediation for VM '{ctx.state.get('target_vm_name')}' "
+            f"(comment: {comment!r}) -> route='{route}'"
+        )
+
     decision_state = {
-        "approval_status": route,
+        "approval_status": approval_status,
         "approved_by": approver,
         "approval_comment": comment,
-        "audit_status": "remediated" if approved else "remediation-rejected",
+        "audit_status": audit_status,
         "risk_level": "low" if approved else "high",
     }
-    summary_text = (
-        f"[Node 4B: request_remediation_approval] Operator '{approver}' "
-        f"{route.upper()} remediation for VM '{ctx.state.get('target_vm_name')}' "
-        f"(comment: {comment!r}) -> route='{route}'"
-    )
     yield Event(
         author="request_remediation_approval",
-        content=types.Content(role="model", parts=[types.Part.from_text(text=summary_text)]),
+        content=types.Content(
+            role="model", parts=[types.Part.from_text(text=summary_text)]
+        ),
         output=decision_state,
         route=route,
         state=decision_state,
@@ -406,7 +502,7 @@ Always use '=' between flag names and values. After all three commands succeed, 
 
 
 # ---------------------------------------------------------------------------
-# Node 5B: Rejection Audit Handler (FunctionNode, route="rejected")
+# Node 5B: Rejection / Expiry / Timeout Audit Handler (FunctionNode, route="rejected")
 # ---------------------------------------------------------------------------
 def remediation_rejected_node(
     target_project: str,
@@ -414,10 +510,16 @@ def remediation_rejected_node(
     target_vm_name: str,
     approved_by: str,
     approval_comment: str,
+    approval_status: str = "rejected",
 ) -> Event:
-    """Logs that human operator rejected remediation and leaves the VM untouched."""
+    """Logs that remediation was rejected, expired, or timed out, leaving the VM untouched."""
+    status_label = {
+        "expired": "REMEDIATION_EXPIRED",
+        "timed_out_default_rejected": "REMEDIATION_TIMED_OUT",
+    }.get(approval_status, "REMEDIATION_REJECTED")
     report = {
-        "status": "REMEDIATION_REJECTED",
+        "status": status_label,
+        "approval_status": approval_status,
         "target_project": target_project,
         "target_zone": default_zone,
         "target_vm_name": target_vm_name,
@@ -426,7 +528,7 @@ def remediation_rejected_node(
         "action_taken": f"No changes made. VM '{target_vm_name}' remains TERMINATED.",
     }
     text_msg = (
-        f"Remediation cancelled by operator '{approved_by}' "
+        f"Remediation cancelled [{status_label}] by '{approved_by}' "
         f"(reason: {approval_comment!r}). VM '{target_vm_name}' in zone "
         f"'{default_zone}' was left in TERMINATED state."
     )
