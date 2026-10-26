@@ -52,6 +52,7 @@ from google.adk.agents.context import Context
 from google.adk.apps import App, ResumabilityConfig
 from google.adk.events.event import Event
 from google.adk.events.request_input import RequestInput
+from google.adk.models import Gemini
 from google.adk.tools.mcp_tool import McpToolset
 from google.adk.tools.mcp_tool.mcp_session_manager import (
     StreamableHTTPConnectionParams,
@@ -62,9 +63,17 @@ from google.genai import types
 DEFAULT_PROJECT_ID = os.environ.get("GOOGLE_CLOUD_PROJECT", "YOUR_PROJECT_ID")
 DEFAULT_REGION = os.environ.get("GOOGLE_CLOUD_REGION", "us-central1")
 DEFAULT_ZONE = os.environ.get("GOOGLE_CLOUD_ZONE", "us-central1-a")
-os.environ.setdefault("GOOGLE_CLOUD_LOCATION", "global")
+os.environ.setdefault("GOOGLE_CLOUD_LOCATION", DEFAULT_REGION)
 GCLOUD_MCP_URL = "https://cloudcli.googleapis.com/mcp"
 HITL_INTERRUPT_ID = "approve_vm_remediation"
+
+
+def _get_gemini_model() -> Gemini:
+    """Returns the Gemini model instance configured for Vertex AI."""
+    return Gemini(
+        model=os.environ.get("ADK_MODEL", "gemini-3.8-flash"),
+        client_kwargs={"location": "global"},
+    )
 
 
 def get_dynamic_mcp_headers(ctx: Any = None) -> dict[str, str]:
@@ -126,7 +135,7 @@ def init_audit_context(node_input: str) -> Event:
 # ---------------------------------------------------------------------------
 vm_discovery_agent = LlmAgent(
     name="vm_discovery_agent",
-    model=os.environ.get("ADK_MODEL", "gemini-3-flash-preview"),
+    model=_get_gemini_model(),
     description="Discovers Compute Engine VM instances in the target project and zone via Remote MCP.",
     instruction="""You are the Cloud Discovery Node in an automated ADK Workflow.
 
@@ -250,7 +259,7 @@ def evaluate_and_route(
 # ---------------------------------------------------------------------------
 healthy_compliance_agent = LlmAgent(
     name="healthy_compliance_agent",
-    model=os.environ.get("ADK_MODEL", "gemini-3-flash-preview"),
+    model=_get_gemini_model(),
     description="Tags healthy VMs and their boot disks as compliant in a single HTTP request.",
     instruction="""You are the Healthy Compliance Node in an ADK Workflow.
 All inspected Compute Engine VMs in zone {default_zone} passed the health check (status=RUNNING), so no Human-in-the-Loop approval was needed.
@@ -362,7 +371,7 @@ async def request_remediation_approval(
 # ---------------------------------------------------------------------------
 remediation_executor_agent = LlmAgent(
     name="remediation_executor_agent",
-    model=os.environ.get("ADK_MODEL", "gemini-3-flash-preview"),
+    model=_get_gemini_model(),
     description="Executes live VM labeling, disk labeling, and VM startup after human approval.",
     instruction="""You are the Approved Remediation Executor Node in a Resumable ADK Workflow.
 A human operator (`{approved_by}`) has explicitly APPROVED remediating the stopped VM `{target_vm_name}` (comment: `{approval_comment}`).

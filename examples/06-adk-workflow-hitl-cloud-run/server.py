@@ -1,12 +1,8 @@
 """FastAPI entrypoint for the Part 3 Resumable HITL ADK Workflow on Cloud Run.
 
 Configures ADK's FastAPI server (`get_fast_api_app`) with `VertexAiSessionService`
-using the explicit 6-part `agentengine://` resource URI:
-  agentengine://projects/{project}/locations/{region}/reasoningEngines/{agent_engine_id}
-
-This allows `VertexAiSessionService` to persist sessions and HITL event checkpoints
-in a regional Vertex AI ReasoningEngine (e.g. `us-central1`) while `gemini-3-flash-preview`
-continues using `GOOGLE_CLOUD_LOCATION=global`.
+(`agentengine://{agent_engine_id}`) so session state and HITL event checkpoints
+persist across stateless Cloud Run instances and scale-to-zero events.
 """
 
 from __future__ import annotations
@@ -20,23 +16,18 @@ from google.adk.cli.fast_api import get_fast_api_app
 
 BASE_DIR = Path(__file__).resolve().parent
 
-os.environ.setdefault("GOOGLE_CLOUD_LOCATION", "global")
+os.environ.setdefault("GOOGLE_CLOUD_LOCATION", "us-central1")
 os.environ.setdefault("GOOGLE_GENAI_USE_VERTEXAI", "TRUE")
 
 project_id = os.environ.get("GOOGLE_CLOUD_PROJECT", "")
-agent_engine_location = os.environ.get(
-    "AGENT_ENGINE_LOCATION", os.environ.get("GOOGLE_CLOUD_REGION", "us-central1")
-)
-agent_engine_id = os.environ.get("GOOGLE_CLOUD_AGENT_ENGINE_ID", "")
+location = os.environ.get("GOOGLE_CLOUD_LOCATION", "us-central1")
+agent_engine_id = os.environ.get("GOOGLE_CLOUD_AGENT_ENGINE_ID", "").strip()
 
-if project_id and agent_engine_id:
-    if "/" in agent_engine_id:
-        session_service_uri = f"agentengine://{agent_engine_id}"
+if agent_engine_id:
+    if agent_engine_id.startswith("agentengine://"):
+        session_service_uri = agent_engine_id
     else:
-        session_service_uri = (
-            f"agentengine://projects/{project_id}/locations/{agent_engine_location}"
-            f"/reasoningEngines/{agent_engine_id}"
-        )
+        session_service_uri = f"agentengine://{agent_engine_id}"
 else:
     session_service_uri = os.environ.get("SESSION_SERVICE_URI", "memory://")
 
@@ -61,7 +52,7 @@ async def healthz() -> dict[str, str]:
         "session_backend": backend,
         "session_service_uri": session_service_uri,
         "project": project_id or "unset",
-        "agent_engine_location": agent_engine_location,
+        "location": location,
     }
 
 

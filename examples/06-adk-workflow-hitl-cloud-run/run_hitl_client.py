@@ -179,8 +179,7 @@ def main() -> None:
             env["GOOGLE_CLOUD_PROJECT"] = args.project
         if args.agent_engine_id:
             env["GOOGLE_CLOUD_AGENT_ENGINE_ID"] = args.agent_engine_id
-        env.setdefault("AGENT_ENGINE_LOCATION", "us-central1")
-        env.setdefault("GOOGLE_CLOUD_LOCATION", "global")
+        env.setdefault("GOOGLE_CLOUD_LOCATION", "us-central1")
         env.setdefault("GOOGLE_GENAI_USE_VERTEXAI", "TRUE")
 
         server_dir = Path(__file__).resolve().parent

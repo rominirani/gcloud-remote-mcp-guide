@@ -58,8 +58,8 @@ uv run examples/06-adk-workflow-hitl-cloud-run/setup_session_engine.py \
 Export the returned `GOOGLE_CLOUD_AGENT_ENGINE_ID`:
 
 ```bash
+export GOOGLE_CLOUD_LOCATION="us-central1"
 export GOOGLE_CLOUD_AGENT_ENGINE_ID="YOUR_AGENT_ENGINE_ID"
-export AGENT_ENGINE_LOCATION="us-central1"
 ```
 
 ---

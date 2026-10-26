@@ -152,10 +152,7 @@ def main() -> None:
     engine_id, full_name = ensure_session_engine(
         args.project, args.region, args.display_name
     )
-    session_uri = (
-        f"agentengine://projects/{args.project}/locations/{args.region}"
-        f"/reasoningEngines/{engine_id}"
-    )
+    session_uri = f"agentengine://{engine_id}"
 
     print("\n" + "=" * 78)
     print("VertexAiSessionService Store Ready!")
@@ -166,7 +163,7 @@ def main() -> None:
     print("=" * 78)
     print("\nExport for local & Cloud Run execution:")
     print(f'export GOOGLE_CLOUD_PROJECT="{args.project}"')
-    print(f'export AGENT_ENGINE_LOCATION="{args.region}"')
+    print(f'export GOOGLE_CLOUD_LOCATION="{args.region}"')
     print(f'export GOOGLE_CLOUD_AGENT_ENGINE_ID="{engine_id}"')
 
 
