@@ -41,6 +41,7 @@ and the Google Cloud CLI Remote MCP Server (`https://cloudcli.googleapis.com/mcp
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import re
@@ -256,6 +257,23 @@ def evaluate_and_route(
         expires_at, tz=timezone.utc
     ).strftime("%Y-%m-%dT%H:%M:%SZ")
 
+    exact_gcloud_commands = (
+        [
+            f"gcloud compute instances add-labels {vm_name} --zone={vm_zone} --labels=audit-status=remediated,risk-level=low --project={target_project} --quiet",
+            f"gcloud compute disks add-labels {vm_name} --zone={vm_zone} --labels=audit-status=remediated,risk-level=low --project={target_project} --quiet",
+            f"gcloud compute instances start {vm_name} --zone={vm_zone} --project={target_project} --async --format=json --quiet",
+        ]
+        if route == "needs_remediation"
+        else []
+    )
+    action_digest = (
+        hashlib.sha256(
+            json.dumps(exact_gcloud_commands).encode("utf-8")
+        ).hexdigest()[:12]
+        if exact_gcloud_commands
+        else ""
+    )
+
     state_updates = {
         "target_vm_name": vm_name,
         "target_vm_status": vm_status,
@@ -264,6 +282,8 @@ def evaluate_and_route(
         "risk_level": risk_level,
         "remediation_reason": reason,
         "terminated_vms": non_running_vms,
+        "exact_gcloud_commands": exact_gcloud_commands,
+        "action_digest": action_digest,
         "approval_requested_at": requested_at,
         "approval_expires_at": expires_at,
         "approval_expires_at_iso": expires_at_iso,
@@ -336,6 +356,10 @@ async def request_remediation_approval(
         default_timeout_action = str(
             ctx.state.get("default_timeout_action", DEFAULT_TIMEOUT_ACTION)
         )
+        exact_gcloud_commands = list(
+            ctx.state.get("exact_gcloud_commands") or []
+        )
+        action_digest = str(ctx.state.get("action_digest", ""))
 
         proposed_actions = [
             f"Label VM '{vm_name}' with audit-status=remediated,risk-level=low",
@@ -345,7 +369,8 @@ async def request_remediation_approval(
         prompt_msg = (
             f"HITL Approval Required: {reason} "
             f"Approve live remediation on '{vm_name}' in project '{project_id}'? "
-            f"(Expires at {expires_at_iso} [TTL={ttl_seconds}s]; default action on timeout='{default_timeout_action}')"
+            f"(Action Digest={action_digest}, Expires at {expires_at_iso} [TTL={ttl_seconds}s], "
+            f"default action on timeout='{default_timeout_action}')"
         )
 
         yield RequestInput(
@@ -358,6 +383,8 @@ async def request_remediation_approval(
                 "target_vm_name": vm_name,
                 "reason": reason,
                 "proposed_actions": proposed_actions,
+                "exact_gcloud_commands": exact_gcloud_commands,
+                "action_digest": action_digest,
                 "ttl_seconds": ttl_seconds,
                 "expires_at": expires_at,
                 "expires_at_iso": expires_at_iso,
@@ -377,11 +404,13 @@ async def request_remediation_approval(
             }
 
     timed_out = False
+    submitted_digest = ""
     if isinstance(resume_data, dict):
         timed_out = bool(resume_data.get("timed_out", False))
         approved = bool(resume_data.get("approved", False))
         approver = str(resume_data.get("approver", "sre-operator"))
         comment = str(resume_data.get("reason", resume_data.get("comment", "")))
+        submitted_digest = str(resume_data.get("action_digest", "")).strip()
     else:
         approved = bool(resume_data)
         approver = "sre-operator"
@@ -396,7 +425,13 @@ async def request_remediation_approval(
     default_timeout_action = str(
         ctx.state.get("default_timeout_action", DEFAULT_TIMEOUT_ACTION)
     ).lower()
+    expected_digest = str(ctx.state.get("action_digest", "")).strip()
     is_expired = expires_at > 0 and now_ts > expires_at
+    is_digest_mismatch = bool(
+        submitted_digest
+        and expected_digest
+        and submitted_digest != expected_digest
+    )
 
     if timed_out:
         # Feature 2: Default Action when Nobody Answers within TTL
@@ -415,6 +450,20 @@ async def request_remediation_approval(
             f"[Node 4B: request_remediation_approval] No human response within {ttl_seconds}s TTL; "
             f"watchdog '{approver}' applied default_timeout_action='{default_timeout_action}' "
             f"for VM '{ctx.state.get('target_vm_name')}' -> route='{route}'"
+        )
+    elif is_digest_mismatch:
+        # Feature 3: Exact Action Digest Verification (Reject approvals bound to a different command plan)
+        approved = False
+        route = "rejected"
+        approval_status = "digest_mismatch"
+        audit_status = "remediation-digest-mismatch"
+        comment = (
+            f"Action digest mismatch blocked: approval was signed for digest '{submitted_digest}', "
+            f"but current command plan digest is '{expected_digest}'."
+        )
+        summary_text = (
+            f"[Node 4B: request_remediation_approval] ACTION DIGEST MISMATCH BLOCKED for VM "
+            f"'{ctx.state.get('target_vm_name')}': submitted={submitted_digest!r} != expected={expected_digest!r} -> route='rejected'"
         )
     elif is_expired:
         # Feature 1: Stale Approval Guard (Reject late approvals after TTL expiry)
@@ -468,7 +517,7 @@ async def request_remediation_approval(
 remediation_executor_agent = LlmAgent(
     name="remediation_executor_agent",
     model=_get_gemini_model(),
-    description="Executes live VM labeling, disk labeling, and VM startup after human approval.",
+    description="Re-verifies live VM preconditions on resume, then executes VM/disk labeling and VM startup.",
     instruction="""You are the Approved Remediation Executor Node in a Resumable ADK Workflow.
 A human operator (`{approved_by}`) has explicitly APPROVED remediating the stopped VM `{target_vm_name}` (comment: `{approval_comment}`).
 
@@ -476,11 +525,18 @@ Workflow State Variables:
 - Target Project: {target_project}
 - Target Zone: {default_zone}
 - Target VM Name: {target_vm_name}
+- Expected Precondition Status at Pause Time: {target_vm_status}
 - Approved By: {approved_by}
 - Audit Status Label: {audit_status}
 - Risk Level Label: {risk_level}
 
-Execute ALL THREE of the following remediation actions in Google Cloud using `run_gcloud_command`:
+Step 0 — Precondition Re-Verification on Resume (Guard against state drift while paused):
+- First, call `run_gcloud_command` to inspect the live VM status right now:
+  - `project`: "projects/{target_project}"
+  - `command`: "gcloud compute instances describe {target_vm_name} --zone={default_zone} --project={target_project} --format=value(status)"
+- If the live status is already `RUNNING` (meaning the incident resolved or another operator fixed it while the workflow was paused), DO NOT run `gcloud compute instances start`; simply report that precondition re-verification detected the VM is already `RUNNING` and skipped duplicate startup.
+
+If the live status still matches `{target_vm_status}` (`TERMINATED`), execute ALL THREE of the following remediation actions in Google Cloud using `run_gcloud_command`:
 
 Action 1 — Tag the VM instance with compliance labels:
 - `project`: "projects/{target_project}"
@@ -494,7 +550,7 @@ Action 3 — Start the stopped VM asynchronously (`--async`) so it returns to se
 - `project`: "projects/{target_project}"
 - `command`: "gcloud compute instances start {target_vm_name} --zone={default_zone} --project={target_project} --async --format=json --quiet"
 
-Always use '=' between flag names and values. After all three commands succeed, provide a concise summary including the `operation-...` ID from Action 3.
+Always use '=' between flag names and values. After all commands succeed, provide a concise summary including the `operation-...` ID from Action 3.
 """,
     tools=[gcloud_mcp_tools],
     output_key="workflow_execution_result",

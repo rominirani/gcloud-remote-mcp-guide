@@ -343,10 +343,14 @@ def main() -> None:
                         if approved
                         else "Rejected by SRE on-call; VM intentionally stopped for maintenance."
                     )
+                    action_digest = str(
+                        (int_args.get("payload") or {}).get("action_digest", "")
+                    )
                     decision_payload = {
                         "approved": approved,
                         "approver": args.approver,
                         "reason": reason,
+                        "action_digest": action_digest,
                     }
                 print(
                     f"\n=== HTTP Request 2: POST /run (Resume Session {session_id} with Decision) ==="
