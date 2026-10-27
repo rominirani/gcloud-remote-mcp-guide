@@ -514,6 +514,62 @@ async def request_remediation_approval(
 # ---------------------------------------------------------------------------
 # Node 5A: Approved Remediation Executor (LlmAgent + Remote MCP, route="approved")
 # ---------------------------------------------------------------------------
+def enforce_approved_commands_callback(
+    tool: Any,
+    args: dict[str, Any],
+    tool_context: Any,
+) -> dict[str, Any] | None:
+    """OWASP LLM06 Guardrail: Enforces in Python that Node 5A only runs human-approved commands."""
+    state = tool_context.state
+    if state.get("approval_status") != "approved":
+        return {
+            "error": (
+                "Blocked by before_tool_callback (OWASP LLM06): "
+                f"approval_status is '{state.get('approval_status')}', not 'approved'."
+            )
+        }
+
+    approved_commands: list[str] = list(state.get("exact_gcloud_commands") or [])
+    expected_digest = str(state.get("action_digest", "")).strip()
+    computed_digest = (
+        hashlib.sha256(
+            json.dumps(approved_commands).encode("utf-8")
+        ).hexdigest()[:12]
+        if approved_commands
+        else ""
+    )
+    if not expected_digest or computed_digest != expected_digest:
+        return {
+            "error": (
+                "Blocked by before_tool_callback (OWASP LLM06): "
+                f"computed digest '{computed_digest}' does not match approved action_digest '{expected_digest}'."
+            )
+        }
+
+    target_project = str(state.get("target_project", ""))
+    default_zone = str(state.get("default_zone", ""))
+    target_vm_name = str(state.get("target_vm_name", ""))
+    precondition_check_cmd = (
+        f"gcloud compute instances describe {target_vm_name} "
+        f"--zone={default_zone} --project={target_project} --format=value(status)"
+    )
+    allowed_commands = set(approved_commands) | {precondition_check_cmd}
+
+    requested_command = " ".join(str(args.get("command", "")).strip().split())
+    normalized_allowed = {
+        " ".join(cmd.strip().split()) for cmd in allowed_commands
+    }
+    if requested_command not in normalized_allowed:
+        return {
+            "error": (
+                "Blocked by before_tool_callback (OWASP LLM06): "
+                f"command '{requested_command}' is not in the human-approved exact_gcloud_commands allowlist."
+            )
+        }
+
+    return None
+
+
 remediation_executor_agent = LlmAgent(
     name="remediation_executor_agent",
     model=_get_gemini_model(),
@@ -529,6 +585,7 @@ Workflow State Variables:
 - Approved By: {approved_by}
 - Audit Status Label: {audit_status}
 - Risk Level Label: {risk_level}
+- Approved Command Allowlist (enforced by Python before_tool_callback): {exact_gcloud_commands}
 
 Step 0 — Precondition Re-Verification on Resume (Guard against state drift while paused):
 - First, call `run_gcloud_command` to inspect the live VM status right now:
@@ -553,6 +610,7 @@ Action 3 — Start the stopped VM asynchronously (`--async`) so it returns to se
 Always use '=' between flag names and values. After all commands succeed, provide a concise summary including the `operation-...` ID from Action 3.
 """,
     tools=[gcloud_mcp_tools],
+    before_tool_callback=enforce_approved_commands_callback,
     output_key="workflow_execution_result",
 )
 

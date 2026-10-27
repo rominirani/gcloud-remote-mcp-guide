@@ -36,6 +36,7 @@ START (HTTP Request 1: POST /run)
                └── Pass 2 (HTTP Request 2: POST /run with functionResponse):
                      ⚡ Fast-forwards past Nodes 1–3 (no duplicate MCP discovery!)
                      ├── route == "approved" ──► [Node 5A: remediation_executor_agent]
+                     │                             (Python before_tool_callback enforces exact_gcloud_commands + action_digest)
                      │                             (Labels VM & Disk + Starts VM via Remote MCP)
                      └── route == "rejected" ──► [Node 5B: remediation_rejected_node]
                                                    (Audit Log: Leaves VM TERMINATED)
